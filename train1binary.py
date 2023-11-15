@@ -17,6 +17,10 @@ Let's start with the data preparation and model setup:
 """
 
 
+# good resource from Isha: https://docs.ffcv.io/ffcv_examples/cifar10.html
+
+
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -31,7 +35,9 @@ import os
 def load_cifar100():
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        # https://gist.github.com/weiaicunzai/e623931921efefd4c331622c344d8151#file-cifar100_mean_std-py
+        # this source details how and what mean and std of the datasets are
     ])
 
     trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
@@ -56,10 +62,13 @@ def create_binary_datasets(trainset, testset):
     return binary_datasets
 
 # Model Setup
-def initialize_model():
+def initialize_model(device):
     model = resnet18(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, 2) # Adjusting the final layer for binary classification
+    model.to_prop = nn.Softmax(dim=1)
+    model = model.to(device)
     return model
+
 
 # Training Function
 def train_model(model, train_loader, criterion, optimizer, scheduler, num_epochs=10):
@@ -85,11 +94,18 @@ def train_model(model, train_loader, criterion, optimizer, scheduler, num_epochs
 
 # Main Function
 def main():
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(f'Using device {device}')
+
+
     trainset, testset = load_cifar100()
+    print(f'Trainset size: {len(trainset)}')
     binary_datasets = create_binary_datasets(trainset, testset)
 
     for i, (train_subset, test_subset) in enumerate(binary_datasets):
-        model = initialize_model()
+        model = initialize_model(device)
         train_loader = DataLoader(train_subset, batch_size=256, shuffle=True)
         
         criterion = nn.CrossEntropyLoss()
