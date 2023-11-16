@@ -1,8 +1,10 @@
 # deep-learning-advanced-initialization
 Deep Learning Project ETHZ HS23
 
-##
+## Creating the python environment for ffcv: 
 
+For CUDA devices: Clone the environment_cuda.yaml file
+For Apple/MPS devices: TBD
 
 Data: 
 
