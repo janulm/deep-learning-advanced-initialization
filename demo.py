@@ -87,11 +87,8 @@ def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./da
 
 def generate_model(output_dim:int = 100):
     
-    #ResNet general source: https://pytorch.org/vision/master/models/resnet.html
-    
+    #ResNet general source: https://pytorch.org/vision/master/models/resnet.html 
     model = torchvision.models.resnet18(weights=None)
-    # make fc a sequential layer
-    #model.fc = ch.nn.Sequential(ch.nn.Linear(model.fc.in_features, output_dim), ch.nn.Softmax(dim=1))
     model.fc = ch.nn.Linear(model.fc.in_features, output_dim)
     model = model.to(device=device)
     return model
@@ -119,7 +116,7 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
     
     
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
-    criterion = ch.nn.CrossEntropyLoss()
+    criterion = ch.nn.CrossEntropyLoss() # doesn't require the input to be in valid probabilities format
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=reduce_patience, verbose=True, factor=reduce_factor)
     len_train_loader = len(loaders['train'])
     
@@ -179,7 +176,7 @@ loaders, start_time = make_dataloaders(batch_size=256, num_workers=12)
 model = generate_model()
 # load model from checkpoint stored at ./models/model.pt
 #model.load_state_dict(torch.load("./models/model.pt"))
-model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,do_tracking=True,verbose=True)
+model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,reduce_factor=0.1,do_tracking=True,verbose=True)
 print(f'Total time: {time.time() - start_time:.5f}')
 evaluate(model, loaders)
 
