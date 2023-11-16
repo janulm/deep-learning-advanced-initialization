@@ -46,7 +46,7 @@ def load_cifar100(train_dataset="./data/cifar_train.beton", val_dataset="./data/
         writer.from_indexed_dataset(ds)
         
 
-def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=1024, num_workers=12):
+def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12):
     paths = {
         'train': train_dataset,
         'test': val_dataset
@@ -54,10 +54,7 @@ def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./da
     }
 
     start_time = time.time()
-    # https://gist.github.com/weiaicunzai/e623931921efefd4c331622c344d8151#file-cifar100_mean_std-py
-    # this source details how and what mean and std of the datasets are
-    # took the values from the source above and multiplied by 255
-    # not sure this properly translates to std dev of the dataset TODO: check this	
+    # computed these values earlier and hardcoded them here	
     CIFAR_MEAN = [129.310, 124.108, 112.404]
     CIFAR_STD = [68.2125, 65.4075, 70.4055]
     loaders = {}
@@ -92,57 +89,101 @@ def generate_model(output_dim:int = 100):
     
     #ResNet general source: https://pytorch.org/vision/master/models/resnet.html
     
-    model = torchvision.models.resnet18(pretrained=False)
+    model = torchvision.models.resnet18(weights=None)
     # make fc a sequential layer
-    model.fc = ch.nn.Sequential(ch.nn.Linear(model.fc.in_features, output_dim), ch.nn.Softmax(dim=1))
+    #model.fc = ch.nn.Sequential(ch.nn.Linear(model.fc.in_features, output_dim), ch.nn.Softmax(dim=1))
+    model.fc = ch.nn.Linear(model.fc.in_features, output_dim)
     model = model.to(device=device)
     return model
 
 
-def train(model, loaders, lr=0.1, epochs=50, momentum=0.9, weight_decay=0.0001, lr_peak_epoch=5):
+def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,reduce_patience=5, reduce_factor=0.2,tracking_freq=5,do_tracking=True,verbose=True):
     
-    opt = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
-    iters_per_epoch = len(loaders['train'])
-    # Cyclic LR with single triangle
-    lr_schedule = np.interp(np.arange((epochs+1) * iters_per_epoch),
-                            [0, lr_peak_epoch * iters_per_epoch, epochs * iters_per_epoch],
-                            [0, 1, 0])
-    scheduler = lr_scheduler.LambdaLR(opt, lr_schedule.__getitem__)
-    scaler = GradScaler()
-    loss_fn = CrossEntropyLoss()
-
-    for _ in range(epochs):
-        for ims, labs in tqdm(loaders['train']):
-            opt.zero_grad(set_to_none=True)
+    # dictionary to keep track of training params and results
+    train_dict = {}
+    train_dict['lr'] = lr
+    train_dict['epochs'] = epochs
+    train_dict['momentum'] = momentum
+    train_dict['weight_decay'] = weight_decay
+    train_dict['reduce_patience'] = reduce_patience
+    train_dict['reduce_factor'] = reduce_factor
+    # results
+    # training loss is tracked every epoch
+    train_dict['train_loss'] = []
+    
+    # all other params are tracked every e.g. 10 epochs	(tracking_freq) if do_tracking is True
+    train_dict['train_acc_top1'] = []
+    train_dict['train_acc_top5'] = []
+    train_dict['val_acc_top1'] = []
+    train_dict['val_acc_top5'] = []
+    
+    
+    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    criterion = ch.nn.CrossEntropyLoss()
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=reduce_patience, verbose=True, factor=reduce_factor)
+    len_train_loader = len(loaders['train'])
+    
+    for i in range(epochs):
+        model.train()
+        running_loss = 0.0
+        #for ims, labs in tqdm(loaders['train']):
+        for ims, labs in loaders['train']:
+            optimizer.zero_grad(set_to_none=True)
             with autocast():
                 out = model(ims)
-                loss = loss_fn(out, labs)
+                loss = criterion(out, labs)
+            
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        scheduler.step(running_loss)
+        # save training loss
+        print(f'Epoch {i+1}/{epochs}, Loss: {running_loss/len_train_loader}')
+        train_dict['train_loss'].append(running_loss/len_train_loader)
+        # keep track of other metrics
+        if do_tracking and (i+1)%tracking_freq == 0:
+            train_top1, train_top5, val_top1, val_top5 = evaluate(model, loaders, lr_tta=False,verbose=verbose)
+            train_dict['train_acc_top1'].append(train_top1)
+            train_dict['train_acc_top5'].append(train_top5)
+            train_dict['val_acc_top1'].append(val_top1)
+            train_dict['val_acc_top5'].append(val_top5)
+    return model, train_dict
 
-            scaler.scale(loss).backward()
-            scaler.step(opt)
-            scaler.update()
-            scheduler.step()
-
-
-def evaluate(model, loaders, lr_tta=False):
+def evaluate(model, loaders, lr_tta=False,verbose=True):
     # lr_tta: whether to use test-time augmentation by flipping images horizontally
     model.eval()
+    train_top1, train_top5, val_top1, val_top5 = 0., 0., 0., 0.
     with ch.no_grad():
         for name in ['train', 'test']:
-            total_correct, total_num = 0., 0.
-            for ims, labs in tqdm(loaders[name]):
+            total_correct, total_num, total_correct_top5 = 0., 0., 0.
+            for ims, labs in loaders[name]:
                 with autocast():
                     out = model(ims)
                     if lr_tta:
                         out += model(ims.flip(-1))
+                    # computing top1 accuracy
                     total_correct += out.argmax(1).eq(labs).sum().cpu().item()
                     total_num += ims.shape[0]
-            print(f'{name} accuracy: {total_correct / total_num * 100:.1f}%')
-
+                    # computing top5 accuracy
+                    total_correct_top5 += out.argsort(1)[:,-5:].eq(labs.unsqueeze(-1)).sum().cpu().item()
+            if verbose:
+                print(f'{name} (acc) top-1: {total_correct / total_num * 100:.1f}, top-5: {total_correct_top5 / total_num * 100:.1f} %')
+            if name == 'train':
+                train_top1, train_top5 = total_correct / total_num * 100, total_correct_top5 / total_num * 100
+            else:
+                val_top1, val_top5 = total_correct / total_num * 100, total_correct_top5 / total_num * 100
+    return train_top1, train_top5, val_top1, val_top5
 
 load_cifar100()
-loaders, start_time = make_dataloaders()
+loaders, start_time = make_dataloaders(batch_size=256, num_workers=12)
 model = generate_model()
-train(model, loaders)
+# load model from checkpoint stored at ./models/model.pt
+#model.load_state_dict(torch.load("./models/model.pt"))
+model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,do_tracking=True,verbose=True)
 print(f'Total time: {time.time() - start_time:.5f}')
 evaluate(model, loaders)
+
+# store the model   
+torch.save(model.state_dict(), "./models/model.pt")	
+# save the tracked params
+np.save("./models/tracked_params.npy", tracked_params)
