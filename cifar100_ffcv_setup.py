@@ -108,6 +108,33 @@ datasets["test"].coarse_targets = sparse2coarse(datasets["test"].targets)
 def remap_labels(labels, mapping):
     return np.array([mapping[label] for label in labels])
 
+
+
+################## ONLY DEBUGGING CODE BELOW #####################
+# test how much storage it takes to store the entire dataset with this method
+# shouldnt differ much with the original dataset on top but does a little, but also only takes 290MB
+# test with writing entire ds 
+for dataset_name in ["train", "test"]:
+    idx = (datasets[dataset_name].coarse_targets >= 0) | (datasets[dataset_name].coarse_targets >= 0)
+    # fill code here
+    subset_data = [(datasets[dataset_name].data[k], datasets[dataset_name].targets[k]) for k in np.where(idx)[0]]
+    # Create a label mapping for the current pair of superclasses
+    unique_labels = np.sort(np.unique([label for _, label in subset_data]))
+    label_mapping = {label: new_label for new_label, label in enumerate(unique_labels)}
+    # Remap labels
+
+    remapped_data = [(image, label_mapping[label]) for image, label in subset_data]
+
+    # Define path for the new subset beton file
+    subset_path = f'./data/subsets/{dataset_name}_superclass_all.beton'
+
+    # Write the subset dataset to a new beton file
+    writer = DatasetWriter(subset_path, {'image': RGBImageField(), 'label': IntField()})
+    writer.from_indexed_dataset(remapped_data)
+
+
+########### END OF TESTING CODE
+
 for i in range(0,20):
     for j in range(i+1,20):
         for dataset_name in ["train", "test"]:
