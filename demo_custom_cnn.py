@@ -1,3 +1,6 @@
+## model design: https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-build-a-convnet-for-cifar-10-and-cifar-100-classification-with-keras.md
+
+
 from argparse import ArgumentParser
 from typing import List
 import time
@@ -12,6 +15,9 @@ from torch.nn import CrossEntropyLoss, Conv2d, BatchNorm2d
 from torch.optim import SGD, lr_scheduler
 from torchvision.transforms import v2
 import torchvision
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 from fastargs import get_current_config, Param, Section
 from fastargs.decorators import param
@@ -92,13 +98,33 @@ def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./da
     return loaders, start_time
 
 
-def generate_model(output_dim:int = 100):
-    
-    #ResNet general source: https://pytorch.org/vision/master/models/resnet.html 
-    model = torchvision.models.resnet18(weights=None)
-    model.fc = ch.nn.Linear(model.fc.in_features, output_dim)
-    model = model.to(device=device)
-    return model
+
+# Define the CNN model in PyTorch
+class MyCNNModel(nn.Module):
+    def __init__(self, no_classes):
+        super(MyCNNModel, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3, 3)) # output shape: 
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3))
+        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3))
+        self.pool = nn.MaxPool2d(kernel_size=(2, 2))
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(512, 256)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, no_classes)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
+        x = self.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+def generate_model(output_dim=100):
+    model = MyCNNModel(output_dim)
+    return model.to(device)
 
 
 def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,reduce_patience=5, reduce_factor=0.2,tracking_freq=5,do_tracking=True,verbose=True):
@@ -181,9 +207,10 @@ def evaluate(model, loaders, lr_tta=False,verbose=True):
 load_cifar100()
 loaders, start_time = make_dataloaders(batch_size=256, num_workers=12)
 model = generate_model()
+print(model)
 # load model from checkpoint stored at ./models/model.pt
 #model.load_state_dict(torch.load("./models/model.pt"))
-model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,reduce_factor=0.2,do_tracking=True,verbose=True)
+model, tracked_params = train(model, loaders,epochs=60,tracking_freq=5,reduce_factor=0.2,do_tracking=True,verbose=True)
 print(f'Total time: {time.time() - start_time:.5f}')
 evaluate(model, loaders)
 
