@@ -10,6 +10,7 @@ import torch as ch
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import CrossEntropyLoss, Conv2d, BatchNorm2d
 from torch.optim import SGD, lr_scheduler
+from torchvision.transforms import v2
 import torchvision
 
 from fastargs import get_current_config, Param, Section
@@ -64,16 +65,22 @@ def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./da
         image_pipeline: List[Operation] = [SimpleRGBImageDecoder()]
         if name == 'train':
             image_pipeline.extend([
-                RandomHorizontalFlip(),
-                RandomTranslate(padding=2, fill=tuple(map(int, CIFAR_MEAN))),
-                Cutout(4, tuple(map(int, CIFAR_MEAN))),
+                RandomHorizontalFlip(), # flips the image horizontally with a probability of 0.5
+                RandomTranslate(padding=2, fill=tuple(map(int, CIFAR_MEAN))), # shifts the image horizontally and vertically by a random amount
+                Cutout(4, tuple(map(int, CIFAR_MEAN))), # sets a random square patch of the image to mean
             ])
         image_pipeline.extend([
             ToTensor(),
             ToDevice(ch.device(device), non_blocking=True),
             ToTorchImage(),
             Convert(ch.float32), # TODO check what the impact for float16 is (it was the initial value, and why it crashes with float16)	
-            torchvision.transforms.Normalize(CIFAR_MEAN, CIFAR_STD),
+        ])
+        if name == 'train':
+            image_pipeline.extend([
+                v2.RandomRotation(15),
+            ])
+        image_pipeline.extend([
+            v2.Normalize(CIFAR_MEAN, CIFAR_STD),
         ])
         
         ordering = OrderOption.RANDOM if name == 'train' else OrderOption.SEQUENTIAL
@@ -176,7 +183,7 @@ loaders, start_time = make_dataloaders(batch_size=256, num_workers=12)
 model = generate_model()
 # load model from checkpoint stored at ./models/model.pt
 #model.load_state_dict(torch.load("./models/model.pt"))
-model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,reduce_factor=0.1,do_tracking=True,verbose=True)
+model, tracked_params = train(model, loaders,epochs=300,tracking_freq=5,reduce_factor=0.2,do_tracking=True,verbose=True)
 print(f'Total time: {time.time() - start_time:.5f}')
 evaluate(model, loaders)
 
