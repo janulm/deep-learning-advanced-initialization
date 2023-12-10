@@ -128,6 +128,8 @@ def write_cifar100_superclass_subsets_to_beton():
                 writer = DatasetWriter(subset_path, {'image': RGBImageField(), 'label': IntField()})
                 writer.from_indexed_dataset(remapped_data)
                 
+                del idx, subset_data, unique_labels, label_mapping, remapped_data, writer
+                
 
 
 def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
@@ -164,10 +166,60 @@ def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./da
             v2.Normalize(CIFAR_MEAN, CIFAR_STD),
         ])
         
-        ordering = OrderOption.RANDOM if name == 'train' else OrderOption.SEQUENTIAL
+        ordering = OrderOption.QUASI_RANDOM if name == 'train' else OrderOption.SEQUENTIAL
 
         loaders[name] = Loader(paths[name], batch_size=batch_size, num_workers=num_workers,
                                order=ordering, drop_last=(name == 'train'),
-                               pipelines={'image': image_pipeline, 'label': label_pipeline})
+                               pipelines={'image': image_pipeline, 'label': label_pipeline},
+                               os_cache=True)
 
     return loaders, start_time
+
+
+import matplotlib.pyplot as plt
+
+def plot_training(tracked_params,name,plot=True, save=False):
+    # Plot the training curves
+    fig, axs = plt.subplots(1, 2, figsize=(20, 10))
+    desc = f"Model was trained for {tracked_params['epochs']} epochs, with a weight decay of {tracked_params['weight_decay']}, a learning rate of {tracked_params['lr']} and a momentum of {tracked_params['momentum']} and reduce factor of {tracked_params['reduce_factor']}."
+    # plot the training loss together with the learning rate
+    # compute the x-axis for the train loss, sampled every epoch\
+    x1 = np.arange(0, len(tracked_params['train_loss']), 1)
+    axs[0].plot(x1,tracked_params['train_loss'], label='train_loss')
+    axs[0].set_xlabel('Epoch')
+    axs[0].set_ylabel('Loss')
+    axs[0].set_title(desc)
+    # add the val_loss to the plot
+    # compute the x-axis for the val loss, sampled every "tracking_freq" epoch
+    x2 = np.arange(0, len(tracked_params['train_loss']), tracked_params['tracking_freq'])
+    axs[0].plot(x2, tracked_params['val_loss'], label='val_loss')
+    axs[0].legend(loc=1)
+    
+    # add the learning rate to the plot
+    ax2 = axs[0].twinx()
+    ax2.plot(tracked_params['lr_list'], label='learning_rate', color='red')
+    ax2.set_ylabel('Learning Rate') 
+    # fix that on this plot the legends are overlapping
+    
+    # plot the training accuracy
+    axs[1].plot(tracked_params['train_acc_top1'], label='train_acc')
+    # plot the validation accuracy
+    axs[1].plot(tracked_params['val_acc_top1'], label='val_acc')
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_ylabel('Accuracy')
+    axs[1].set_title(desc)
+    axs[1].legend()
+    # add some spacing between plots 
+    if save: 
+        #plt.savefig(f'./plots/{name}.png')
+        fig.savefig(f'./plots/{name}.png')
+    if plot:    
+        plt.show()
+    
+    # free up memory
+    fig.clear()
+    plt.close(fig)
+    # add the val_loss to the plot
+    
+    
+    
