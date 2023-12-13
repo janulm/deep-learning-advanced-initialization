@@ -221,5 +221,97 @@ def plot_training(tracked_params,name,plot=True, save=False):
     plt.close(fig)
     # add the val_loss to the plot
     
-    
-    
+
+def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False):
+    # dictionary to keep track of training params and results
+    train_dict = {}
+    train_dict['lr'] = lr
+    train_dict['epochs'] = epochs
+    train_dict['momentum'] = momentum
+    train_dict['weight_decay'] = weight_decay
+    train_dict['reduce_patience'] = reduce_patience
+    train_dict['reduce_factor'] = reduce_factor
+    train_dict['tracking_freq'] = tracking_freq
+    # results
+    # training loss is tracked every epoch
+    train_dict['train_loss'] = []
+    train_dict['val_loss'] = []
+    train_dict['lr_list'] = []
+    train_dict['train_acc_top1'] = []
+    train_dict['train_acc_top5'] = []
+    train_dict['val_acc_top1'] = []
+    train_dict['val_acc_top5'] = []
+
+    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    criterion = ch.nn.CrossEntropyLoss()
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=reduce_patience, verbose=verbose, factor=reduce_factor)
+    len_train_loader = len(loaders['train'])
+    len_val_loader = len(loaders['test'])
+
+    best_val_acc = 0
+    early_stopping_counter = 0
+
+    for i in tqdm(range(epochs),disable= not verbose):
+        model.train()
+        running_loss = 0.0
+        total_correct, total_num, total_correct_top5 = 0., 0., 0.
+
+        for ims, labs in loaders['train']:
+            optimizer.zero_grad(set_to_none=True)
+            with autocast():
+                out = model(ims)
+                loss = criterion(out, labs)
+            
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+            if do_tracking and (i+1)%tracking_freq == 0: # only do bookkeeping if needed
+                # computing top1 accuracy
+                total_correct += out.argmax(1).eq(labs).sum().cpu().item()
+                total_num += ims.shape[0]
+                # computing top5 accuracy
+                total_correct_top5 += out.argsort(1)[:,-5:].eq(labs.unsqueeze(-1)).sum().cpu().item()
+                
+        # save training loss
+        if verbose: print(f'Epoch {i+1}/{epochs}, Training Loss: {running_loss/len_train_loader}')
+        train_dict['train_loss'].append(running_loss/len_train_loader)
+        # keep track of the current lr 
+        train_dict['lr_list'].append(optimizer.param_groups[0]['lr'])
+        # keep track of other metrics
+        if do_tracking and (i+1)%tracking_freq == 0:
+            train_top1 = total_correct / total_num * 100
+            train_top5 = total_correct_top5 / total_num * 100
+            val_loss = 0.0
+            total_val_correct, total_val_num, total_val_correct_top5 = 0., 0., 0.
+            model.eval()
+            with ch.no_grad():
+                for val_ims, val_labs in loaders['test']:
+                    val_out = model(val_ims)
+                    val_loss += criterion(val_out, val_labs).item()
+                    # computing top1 accuracy
+                    total_val_correct += val_out.argmax(1).eq(val_labs).sum().cpu().item()
+                    total_val_num += val_ims.shape[0]
+                    # computing top5 accuracy
+                    total_val_correct_top5 += val_out.argsort(1)[:,-5:].eq(val_labs.unsqueeze(-1)).sum().cpu().item()
+            val_loss /= len_val_loader
+            val_top1 = total_val_correct / total_val_num * 100
+            scheduler.step(running_loss)
+            val_top5 = total_val_correct_top5 / total_val_num * 100
+            train_dict['val_loss'].append(val_loss)
+            train_dict['train_acc_top1'].append(train_top1)
+            train_dict['train_acc_top5'].append(train_top5)
+            train_dict['val_acc_top1'].append(val_top1)
+            train_dict['val_acc_top5'].append(val_top5)
+            if verbose: print(f'Epoch {i+1}/{epochs}, Validation Loss: {val_loss}')
+            if i > early_stopping_min_epochs:
+                # Early stopping based on increasing validation loss
+                if val_top1 < best_val_acc:
+                    early_stopping_counter += 1
+                    if early_stopping_counter >= early_stopping_patience:
+                        if verbose: print(f"Early stopping triggered at epoch {i}!")
+                        return model, train_dict
+                else:
+                    best_val_acc = val_top1
+                    early_stopping_counter = 0
+
+    return model, train_dict
