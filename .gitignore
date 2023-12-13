@@ -1,2 +1,4 @@
 /data
 /__pychache__
+*.pt
+*.pth
