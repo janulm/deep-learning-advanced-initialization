@@ -184,6 +184,8 @@ def plot_training(tracked_params,name,plot=True, save=False):
     desc = f"Model was trained for {tracked_params['epochs']} epochs, with a weight decay of {tracked_params['weight_decay']}, a learning rate of {tracked_params['lr']} and a momentum of {tracked_params['momentum']} and reduce factor of {tracked_params['reduce_factor']}."
     # plot the training loss together with the learning rate
     # compute the x-axis for the train loss, sampled every epoch\
+    # set title for the plot
+        
     x1 = np.arange(0, len(tracked_params['train_loss']), 1)
     axs[0].plot(x1,tracked_params['train_loss'], label='train_loss')
     axs[0].set_xlabel('Epoch')
@@ -191,7 +193,8 @@ def plot_training(tracked_params,name,plot=True, save=False):
     axs[0].set_title(desc)
     # add the val_loss to the plot
     # compute the x-axis for the val loss, sampled every "tracking_freq" epoch
-    x2 = np.arange(0, len(tracked_params['train_loss']), tracked_params['tracking_freq'])
+    stop = len(tracked_params['val_loss'])*tracked_params['tracking_freq']
+    x2 = np.arange(0, stop, tracked_params['tracking_freq'])
     axs[0].plot(x2, tracked_params['val_loss'], label='val_loss')
     axs[0].legend(loc=1)
     
@@ -202,12 +205,12 @@ def plot_training(tracked_params,name,plot=True, save=False):
     # fix that on this plot the legends are overlapping
     
     # plot the training accuracy
-    axs[1].plot(tracked_params['train_acc_top1'], label='train_acc')
+    axs[1].plot(x2,tracked_params['train_acc_top1'], label='train_acc')
     # plot the validation accuracy
-    axs[1].plot(tracked_params['val_acc_top1'], label='val_acc')
+    axs[1].plot(x2,tracked_params['val_acc_top1'], label='val_acc')
     axs[1].set_xlabel('Epoch')
     axs[1].set_ylabel('Accuracy')
-    axs[1].set_title(desc)
+    #axs[1].set_title(desc)
     axs[1].legend()
     # add some spacing between plots 
     if save: 
