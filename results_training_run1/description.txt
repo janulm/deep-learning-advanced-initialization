@@ -1,0 +1,7 @@
+All the models for this run were trained for either 40,41,42 epochs, all initialized from random with a different seed. 
+The training parameters were: 
+
+model, tracked_params = inf.train(model, loaders, epochs=epochs,lr=0.1, momentum=0.9, tracking_freq=2, reduce_factor=0.5, reduce_patience=5, 
+do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False)
+
+
