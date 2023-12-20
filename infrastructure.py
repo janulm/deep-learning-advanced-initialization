@@ -17,35 +17,31 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-
-
-
-
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 print(f'Using device {device}')
 
 
-def do_imports_ffcv():
-    from fastargs import get_current_config, Param, Section
-    from fastargs.decorators import param
-    from fastargs.validation import And, OneOf
+#def do_imports_ffcv():
+from fastargs import get_current_config, Param, Section
+from fastargs.decorators import param
+from fastargs.validation import And, OneOf
 
-    from ffcv.fields import IntField, RGBImageField
-    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-    from ffcv.loader import Loader, OrderOption
-    from ffcv.pipeline.operation import Operation
-    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-    from ffcv.transforms.common import Squeeze
-    from ffcv.writer import DatasetWriter
+from ffcv.fields import IntField, RGBImageField
+from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
+from ffcv.loader import Loader, OrderOption
+from ffcv.pipeline.operation import Operation
+from ffcv.transforms import RandomHorizontalFlip, Cutout, \
+    RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
+from ffcv.transforms.common import Squeeze
+from ffcv.writer import DatasetWriter
+
 
 
 
 def write_cifar100_to_beton(): 
-    do_imports_ffcv()
+    #do_imports_ffcv()
     train_dataset="./data/cifar_train.beton"
     val_dataset="./data/cifar_test.beton"
     datasets = {
@@ -107,7 +103,7 @@ def get_cifar_classes():
     return superclass
 
 def write_cifar100_superclass_subsets_to_beton():
-    do_imports_ffcv()
+    #do_imports_ffcv()
     # takes every pair of 20 the superclasses 
     # and creates a dataset with the corresponding 10 classes
     # and stores them to disk
@@ -143,7 +139,7 @@ def write_cifar100_superclass_subsets_to_beton():
 
 
 def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
-    do_imports_ffcv()
+    #do_imports_ffcv()
     paths = {
         'train': train_dataset,
         'test': val_dataset
@@ -234,7 +230,61 @@ def plot_training(tracked_params,name,plot=True, save=False):
     fig.clear()
     plt.close(fig)
     # add the val_loss to the plot
+
+def plot_trainings(tracked_params1, tracked_params2, name1, name2):
+    # Plot the training curves for two tracked_params on the same plot
+    fig, axs = plt.subplots(1, 2, figsize=(20, 10))
     
+    # Plot for train_loss and val_loss
+    desc1 = f"{name1}\nEpochs: {tracked_params1['epochs']}, Weight Decay: {tracked_params1['weight_decay']}, Learning Rate: {tracked_params1['lr']}, Momentum: {tracked_params1['momentum']}, Reduce Factor: {tracked_params1['reduce_factor']}"
+    desc2 = f"{name2}\nEpochs: {tracked_params2['epochs']}, Weight Decay: {tracked_params2['weight_decay']}, Learning Rate: {tracked_params2['lr']}, Momentum: {tracked_params2['momentum']}, Reduce Factor: {tracked_params2['reduce_factor']}"
+    
+    # Plot train_loss and val_loss for model 1
+    x1 = np.arange(0, len(tracked_params1['train_loss']), 1)
+    axs[0].plot(x1, tracked_params1['train_loss'], label=f'train_loss - {name1}')
+    axs[0].plot(x1, tracked_params1['val_loss'], label=f'val_loss - {name1}')
+    
+    # Plot train_loss and val_loss for model 2
+    x2 = np.arange(0, len(tracked_params2['train_loss']), 1)
+    axs[0].plot(x2, tracked_params2['train_loss'], label=f'train_loss - {name2}')
+    axs[0].plot(x2, tracked_params2['val_loss'], label=f'val_loss - {name2}')
+    
+    axs[0].set_xlabel('Epoch')
+    axs[0].set_ylabel('Loss')
+    axs[0].set_title('Training Loss and Validation Loss')
+    axs[0].legend()
+    
+    # Plot for train_acc and val_acc
+    axs[1].plot(x1, tracked_params1['train_acc_top1'], label=f'train_acc - {name1}')
+    axs[1].plot(x1, tracked_params1['val_acc_top1'], label=f'val_acc - {name1}')
+    axs[1].plot(x2, tracked_params2['train_acc_top1'], label=f'train_acc - {name2}')
+    axs[1].plot(x2, tracked_params2['val_acc_top1'], label=f'val_acc - {name2}')
+    
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_ylabel('Accuracy')
+    axs[1].set_title('Training Accuracy and Validation Accuracy')
+    axs[1].legend()
+    
+    plt.suptitle(f"Comparison of Training Curves for {name1} and {name2}")
+    plt.show()
+    
+    # free up memory
+    fig.clear()
+    plt.close(fig)
+
+
+def list_tracked_params_to_avg(list_tracked_params):
+    # Compute the average for each dimension in tracked_params
+    avg_tracked_params = {}
+    for key in list_tracked_params[0].keys():
+        avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
+    return avg_tracked_params
+
+def plot_training_avg(list_tracked_params,name,plot=True, save=False):
+    avg_tracked_params = list_tracked_params_to_avg(list_tracked_params)
+    # Visualize the average tracked_params using the plot_training function
+    plot_training(avg_tracked_params, name,plot,save)
+
 
 def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False):
     # dictionary to keep track of training params and results
