@@ -18,25 +18,34 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-from fastargs import get_current_config, Param, Section
-from fastargs.decorators import param
-from fastargs.validation import And, OneOf
 
-from ffcv.fields import IntField, RGBImageField
-from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-from ffcv.loader import Loader, OrderOption
-from ffcv.pipeline.operation import Operation
-from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-    RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-from ffcv.transforms.common import Squeeze
-from ffcv.writer import DatasetWriter
+
+
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 print(f'Using device {device}')
 
+
+def do_imports_ffcv():
+    from fastargs import get_current_config, Param, Section
+    from fastargs.decorators import param
+    from fastargs.validation import And, OneOf
+
+    from ffcv.fields import IntField, RGBImageField
+    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
+    from ffcv.loader import Loader, OrderOption
+    from ffcv.pipeline.operation import Operation
+    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
+        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
+    from ffcv.transforms.common import Squeeze
+    from ffcv.writer import DatasetWriter
+
+
+
 def write_cifar100_to_beton(): 
+    do_imports_ffcv()
     train_dataset="./data/cifar_train.beton"
     val_dataset="./data/cifar_test.beton"
     datasets = {
@@ -98,6 +107,7 @@ def get_cifar_classes():
     return superclass
 
 def write_cifar100_superclass_subsets_to_beton():
+    do_imports_ffcv()
     # takes every pair of 20 the superclasses 
     # and creates a dataset with the corresponding 10 classes
     # and stores them to disk
@@ -133,6 +143,7 @@ def write_cifar100_superclass_subsets_to_beton():
 
 
 def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
+    do_imports_ffcv()
     paths = {
         'train': train_dataset,
         'test': val_dataset
