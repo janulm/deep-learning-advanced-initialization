@@ -17,10 +17,13 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader, Dataset
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-print(f'Using device {device}')
+#print(f'Using (why does print here device {device}')
 
 
 #def do_imports_ffcv():
@@ -28,20 +31,16 @@ from fastargs import get_current_config, Param, Section
 from fastargs.decorators import param
 from fastargs.validation import And, OneOf
 
-from ffcv.fields import IntField, RGBImageField
-from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-from ffcv.loader import Loader, OrderOption
-from ffcv.pipeline.operation import Operation
-from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-    RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-from ffcv.transforms.common import Squeeze
-from ffcv.writer import DatasetWriter
-
-
-
 
 def write_cifar100_to_beton(): 
-    #do_imports_ffcv()
+    from ffcv.fields import IntField, RGBImageField
+    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
+    from ffcv.loader import Loader, OrderOption
+    from ffcv.pipeline.operation import Operation
+    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
+        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
+    from ffcv.transforms.common import Squeeze
+    from ffcv.writer import DatasetWriter
     train_dataset="./data/cifar_train.beton"
     val_dataset="./data/cifar_test.beton"
     datasets = {
@@ -103,7 +102,14 @@ def get_cifar_classes():
     return superclass
 
 def write_cifar100_superclass_subsets_to_beton():
-    #do_imports_ffcv()
+    from ffcv.fields import IntField, RGBImageField
+    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
+    from ffcv.loader import Loader, OrderOption
+    from ffcv.pipeline.operation import Operation
+    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
+        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
+    from ffcv.transforms.common import Squeeze
+    from ffcv.writer import DatasetWriter
     # takes every pair of 20 the superclasses 
     # and creates a dataset with the corresponding 10 classes
     # and stores them to disk
@@ -138,8 +144,124 @@ def write_cifar100_superclass_subsets_to_beton():
                 
 
 
-def make_dataloaders(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
-    #do_imports_ffcv()
+class CIFAR100Subset(Dataset):
+    def __init__(self, data, targets, transform=None):
+        self.data = data
+        self.targets = targets
+        self.transform = transform
+
+    def __getitem__(self, index):
+        image, label = self.data[index], self.targets[index]
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, label
+
+    def __len__(self):
+        return len(self.data)
+
+def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batch_size=256, num_workers=12):
+    loaders = {}
+    datasets = get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2)
+    for dataset_name in ["train", "test"]:
+        dset = datasets[dataset_name]
+        should_shuffle = dataset_name == "train"
+        if num_workers > 0:
+            loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers, multiprocessing_context="forkserver", persistent_workers=True)
+        else:
+            loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers)
+        loaders[dataset_name] = loader
+        # check if this works, not sure if this deletes to much.
+        #del dset, loader, should_shuffle
+    return loaders
+"""
+def get_loaders_cifar100_superclass_subsets_from_data_sets_pytorch(datasets,batch_size=256, num_workers=12):
+    loaders = {}
+    for dataset_name in ["train", "test"]:
+        dset = datasets[dataset_name]
+        should_shuffle = dataset_name == "train"
+        loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers)
+        loaders[dataset_name] = loader
+        # check if this works, not sure if this deletes to much.
+        #del loader, should_shuffle
+    return loaders
+"""
+
+def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2):
+    assert superclass1 != superclass2, "superclass1 and superclass2 must be different"
+    assert superclass1 <= 19 and superclass1 >= 0, "superclass1 must be between 0 and 19"
+    assert superclass2 <= 19 and superclass2 >= 0, "superclass2 must be between 0 and 19"
+    superclass1,superclass2 = min(superclass1,superclass2),max(superclass1,superclass2)
+
+    datasets = {
+    'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
+    'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
+    }
+    loaders = {}
+    datasets["train"].coarse_targets = sparse2coarse(datasets["train"].targets)
+    datasets["test"].coarse_targets = sparse2coarse(datasets["test"].targets)
+    
+    CIFAR_MEAN = [0.5071, 0.4867, 0.4408]
+    CIFAR_STD = [0.2675, 0.2565, 0.2761]
+    transforms = {
+        'train': v2.Compose([
+            v2.RandomHorizontalFlip(),
+            v2.RandomRotation(15),
+            v2.ToImage(), 
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+        ]),
+        'test': v2.Compose([ 
+            v2.ToImage(), 
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+        ])
+    }
+    dsets = {}
+
+    for dataset_name in ["train", "test"]:
+        # get interger index list where coarse target is superclass1 or superclass2
+        idx = (datasets[dataset_name].coarse_targets == superclass1) | (datasets[dataset_name].coarse_targets == superclass2)
+        data = datasets[dataset_name].data[idx]
+        targets = np.array(datasets[dataset_name].targets)
+        targets = targets[idx]
+
+        
+        # Create a label mapping for the current pair of superclasses
+        unique_labels = np.sort(np.unique(targets))
+        label_mapping = {label: new_label for new_label, label in enumerate(unique_labels)}
+        # Remap targets: 
+        targets_remapped = np.array([label_mapping[label] for label in targets])
+
+        dset = CIFAR100Subset(data, targets_remapped, transform=transforms[dataset_name])
+        dsets[dataset_name] = dset
+        #del idx, data, targets, unique_labels, label_mapping, targets_remapped
+    return dsets
+
+
+def get_loaders_cifar100_superclass_subsets_ffcv(superclass1,superclass2,batch_size=256, num_workers=12,device="cuda"):
+    assert superclass1 != superclass2, "superclass1 and superclass2 must be different"
+    assert superclass1 <= 19 and superclass1 >= 0, "superclass1 must be between 0 and 19"
+    assert superclass2 <= 19 and superclass2 >= 0, "superclass2 must be between 0 and 19"
+    superclass1,superclass2 = min(superclass1,superclass2),max(superclass1,superclass2)
+
+    datasets = {
+    'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
+    'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
+    }
+    paths = [f'./data/subsets/{dataset_name}_superclass_{superclass1}_{superclass2}.beton' for dataset_name in ["train","test"]]
+    loaders, start_time = make_dataloaders_ffcv(paths[0],paths[1],batch_size=batch_size,num_workers=num_workers,device=device)
+    return loaders    
+    
+
+def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
+    from ffcv.fields import IntField, RGBImageField
+    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
+    from ffcv.loader import Loader, OrderOption
+    from ffcv.pipeline.operation import Operation
+    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
+        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
+    from ffcv.transforms.common import Squeeze
+    from ffcv.writer import DatasetWriter
     paths = {
         'train': train_dataset,
         'test': val_dataset
@@ -249,6 +371,9 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     axs[0].plot(x2, tracked_params2['train_loss'], label=f'train_loss - {name2}')
     axs[0].plot(x2, tracked_params2['val_loss'], label=f'val_loss - {name2}')
     
+    print('plotting train loss: 1:',tracked_params1["train_loss"],'2:',tracked_params2["train_loss"])
+    print('plotting val loss: 1:',tracked_params1["val_loss"],'2:',tracked_params2["val_loss"])
+
     axs[0].set_xlabel('Epoch')
     axs[0].set_ylabel('Loss')
     axs[0].set_title('Training Loss and Validation Loss')
@@ -267,6 +392,8 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     
     plt.suptitle(f"Comparison of Training Curves for {name1} and {name2}")
     plt.show()
+
+
     
     # free up memory
     fig.clear()
@@ -286,8 +413,9 @@ def plot_training_avg(list_tracked_params,name,plot=True, save=False):
     plot_training(avg_tracked_params, name,plot,save)
 
 
-def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False):
+def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False,device="cuda",verbose_tqdm=True):
     # dictionary to keep track of training params and results
+    if verbose: print("starting training")
     train_dict = {}
     train_dict['lr'] = lr
     train_dict['epochs'] = epochs
@@ -314,17 +442,19 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
 
     best_val_acc = 0
     early_stopping_counter = 0
-
-    for i in tqdm(range(epochs),disable= not verbose):
+    model = model.to(device)
+    for i in tqdm(range(epochs),disable= not verbose_tqdm):
         model.train()
         running_loss = 0.0
         total_correct, total_num, total_correct_top5 = 0., 0., 0.
 
         for ims, labs in loaders['train']:
+            ims = ims.to(device, non_blocking=True)
+            labs = labs.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
-            with autocast():
-                out = model(ims)
-                loss = criterion(out, labs)
+            #with autocast():
+            out = model(ims)
+            loss = criterion(out, labs)
             
             loss.backward()
             optimizer.step()
@@ -350,6 +480,8 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
             model.eval()
             with ch.no_grad():
                 for val_ims, val_labs in loaders['test']:
+                    val_ims = val_ims.to(device, non_blocking=True)
+                    val_labs = val_labs.to(device, non_blocking=True)
                     val_out = model(val_ims)
                     val_loss += criterion(val_out, val_labs).item()
                     # computing top1 accuracy

@@ -60,7 +60,7 @@ for lr in choices_lr:
 
             print(f"Training model for superclasses {i} and {j} lr = {lr} patience = {patience} factor = {factor}")
             paths =  [f'./data/subsets/{dataset_name}_superclass_{i}_{j}.beton' for dataset_name in ["train","test"]]
-            loaders, start_time = inf.make_dataloaders(paths[0],paths[1])
+            loaders, start_time = inf.make_dataloaders_ffcv(paths[0],paths[1])
             model = custom_resnet_18(10)
             model  = model.to(device)
             model, tracked_params = inf.train(model, loaders,lr=lr,momentum=0.9,epochs=150,tracking_freq=2,reduce_factor=factor,reduce_patience=patience,do_tracking=True,early_stopping_min_epochs=150,early_stopping_patience=5,verbose=False)
