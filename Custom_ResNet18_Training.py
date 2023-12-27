@@ -62,7 +62,7 @@ def train_model(i, j, epochs):
     #try:
     print(f"Training model for superclasses {i} and {j}")
     paths = [f'./data/subsets/{dataset_name}_superclass_{i}_{j}.beton' for dataset_name in ["train", "test"]]
-    loaders, start_time = inf.make_dataloaders(paths[0], paths[1])
+    loaders, start_time = inf.make_dataloaders_ffcv(paths[0], paths[1])
     model = custom_resnet_18(10)
     model = model.to(device)
     model, tracked_params = inf.train(model, loaders, epochs=epochs,lr=0.1, momentum=0.9, tracking_freq=2, reduce_factor=0.5, reduce_patience=5, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False)
