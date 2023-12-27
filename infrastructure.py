@@ -391,10 +391,10 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     axs[1].legend()
     
     plt.suptitle(f"Comparison of Training Curves for {name1} and {name2}")
-    plt.show()
-
-
     
+    # save the plot
+    plt.savefig(f'./plots/{name1}_{name2}.png')
+    #plt.show()
     # free up memory
     fig.clear()
     plt.close(fig)
