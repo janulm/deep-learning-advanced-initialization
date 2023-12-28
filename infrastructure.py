@@ -159,9 +159,9 @@ class CIFAR100Subset(Dataset):
     def __len__(self):
         return len(self.data)
 
-def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batch_size=256, num_workers=12):
+def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batch_size=256, num_workers=12, normalize=False):
     loaders = {}
-    datasets = get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2)
+    datasets = get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,normalize)
     for dataset_name in ["train", "test"]:
         dset = datasets[dataset_name]
         should_shuffle = dataset_name == "train"
@@ -173,20 +173,9 @@ def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batc
         # check if this works, not sure if this deletes to much.
         #del dset, loader, should_shuffle
     return loaders
-"""
-def get_loaders_cifar100_superclass_subsets_from_data_sets_pytorch(datasets,batch_size=256, num_workers=12):
-    loaders = {}
-    for dataset_name in ["train", "test"]:
-        dset = datasets[dataset_name]
-        should_shuffle = dataset_name == "train"
-        loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers)
-        loaders[dataset_name] = loader
-        # check if this works, not sure if this deletes to much.
-        #del loader, should_shuffle
-    return loaders
-"""
 
-def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2):
+
+def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,normalize=True):
     assert superclass1 != superclass2, "superclass1 and superclass2 must be different"
     assert superclass1 <= 19 and superclass1 >= 0, "superclass1 must be between 0 and 19"
     assert superclass2 <= 19 and superclass2 >= 0, "superclass2 must be between 0 and 19"
@@ -202,20 +191,36 @@ def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2):
     
     CIFAR_MEAN = [0.5071, 0.4867, 0.4408]
     CIFAR_STD = [0.2675, 0.2565, 0.2761]
-    transforms = {
-        'train': v2.Compose([
-            v2.RandomHorizontalFlip(),
-            v2.RandomRotation(15),
-            v2.ToImage(), 
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(CIFAR_MEAN, CIFAR_STD)
-        ]),
-        'test': v2.Compose([ 
-            v2.ToImage(), 
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(CIFAR_MEAN, CIFAR_STD)
-        ])
-    }
+    transforms = {}
+    if normalize:
+        transforms = {
+            'train': v2.Compose([
+                v2.RandomHorizontalFlip(),
+                v2.RandomRotation(15),
+                v2.ToImage(), 
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+            ]),
+            'test': v2.Compose([ 
+                v2.ToImage(), 
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+            ])}
+    else:
+        transforms = {
+            'train': v2.Compose([
+                v2.RandomHorizontalFlip(),
+                v2.RandomRotation(15),
+                v2.ToImage(), 
+                v2.ToDtype(torch.float32, scale=True),
+                #v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+            ]),
+            'test': v2.Compose([ 
+                v2.ToImage(), 
+                v2.ToDtype(torch.float32, scale=True),
+                #v2.Normalize(CIFAR_MEAN, CIFAR_STD)
+            ])}
+
     dsets = {}
 
     for dataset_name in ["train", "test"]:
