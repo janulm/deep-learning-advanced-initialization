@@ -2,3 +2,5 @@
 /__pychache__
 *.pt
 *.pth
+.vscode
+

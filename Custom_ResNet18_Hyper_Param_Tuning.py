@@ -19,7 +19,12 @@ import torch.nn.functional as F
 
 from torchvision.models import resnet18
 
-def main():
+choices_lr = [0.1,0.01]
+choices_normalization = [True ,False]
+choices_lr_reduce_patience = [5,100] # the second setting disables reduction completely
+choice_optimizer = ["Adam","SGD"] 
+
+def main_train():
     device = inf.device
     print("Using device: ",device)
 
@@ -47,10 +52,7 @@ def main():
     choices_dataloaders_not_normalized = [inf.get_loaders_cifar100_superclass_subsets_pytorch(i,j,batch_size=128,num_workers=3,normalize=False) for i,j in choices_tuples]
 
 
-    choices_lr = [0.1,0.01]
-    choices_normalization = [True ,False]
-    choices_lr_reduce_patience = [5,100] # the second setting disables reduction completely
-    choice_optimizer = ["Adam","SGD"] 
+
     epochs = 30
 
     i = 0
@@ -100,8 +102,11 @@ def main():
                     
                     
                     
-
+def main_plot(plot=True):
     # compute plots
+
+    best_value = 0.0
+    param_tuple = None
 
     for lr in choices_lr:
         for reduce_patience in choices_lr_reduce_patience:
@@ -111,12 +116,27 @@ def main():
                     # read stored np array
                     name = f'results_training_run2_Adams/hyper_param_testing/tracked_params_{lr}_{reduce_patience}_{normalization}_{optimizer}'
                     tracked_params = np.load(name+".npy", allow_pickle=True).item()
+                    
+                    # compute the mean of the last 5 epochs on the validation acc
+                    val = np.mean(tracked_params["val_acc_top1"][-5:])
+                    if val > best_value:
+                        best_value = val
+                        param_tuple = (lr,reduce_patience,normalization,optimizer)
+
                     # plot training
-                    inf.plot_training(tracked_params,name, False, True,name)
-            
+                    if plot:
+                        inf.plot_training(tracked_params,name, False, True,name)
+    
+
+    print("Best val acc: ",best_value," for lr: ",param_tuple[0]," reduce_patience: ",param_tuple[1]," normalization: ",param_tuple[2]," optimizer: ",param_tuple[3])
 
 
 #### main function call
                     
 if __name__ == "__main__":
-    main()
+    main_train()
+    main_plot(False)
+
+
+    # the best hyperparameters are:
+    # Best val acc:  61.48  for lr:  0.01  reduce_patience:  100  normalization:  False  optimizer:  Adam
