@@ -11,7 +11,7 @@ import torch
 import torch as ch
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import CrossEntropyLoss, Conv2d, BatchNorm2d
-from torch.optim import SGD, lr_scheduler
+from torch.optim import SGD, Adam, lr_scheduler
 from torchvision.transforms import v2
 import torchvision
 import torch.nn as nn
@@ -408,7 +408,12 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
 def list_tracked_params_to_avg(list_tracked_params):
     # Compute the average for each dimension in tracked_params
     avg_tracked_params = {}
+    # for all keys except the individual losses and accuracies just copy the ones, since they are all the same
     for key in list_tracked_params[0].keys():
+        avg_tracked_params[key] = list_tracked_params[0][key]
+   
+    keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5']
+    for key in keys:
         avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
     return avg_tracked_params
 
@@ -438,8 +443,9 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
     train_dict['train_acc_top5'] = []
     train_dict['val_acc_top1'] = []
     train_dict['val_acc_top5'] = []
+    train_dict['optimizer'] = "Adam"
 
-    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+    optimizer = SGD(model.parameters(),momentum=momentum, lr=lr, weight_decay=weight_decay)
     criterion = ch.nn.CrossEntropyLoss()
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=reduce_patience, verbose=verbose, factor=reduce_factor)
     len_train_loader = len(loaders['train'])
