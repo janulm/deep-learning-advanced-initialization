@@ -27,9 +27,9 @@ if not torch.cuda.is_available():
 
 
 #def do_imports_ffcv():
-from fastargs import get_current_config, Param, Section
-from fastargs.decorators import param
-from fastargs.validation import And, OneOf
+#from fastargs import get_current_config, Param, Section
+#from fastargs.decorators import param
+#from fastargs.validation import And, OneOf
 
 
 def write_cifar100_to_beton(): 
@@ -312,7 +312,7 @@ def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset=
 
 import matplotlib.pyplot as plt
 
-def plot_training(tracked_params,name,plot=True, save=False):
+def plot_training(tracked_params,name,plot=True, save=False,save_path="./plots/"):
     # Plot the training curves
     fig, axs = plt.subplots(1, 2, figsize=(20, 10))
     desc = f"Model was trained for {tracked_params['epochs']} epochs, with a weight decay of {tracked_params['weight_decay']}, a learning rate of {tracked_params['lr']} and a momentum of {tracked_params['momentum']} and reduce factor of {tracked_params['reduce_factor']}."
@@ -349,7 +349,7 @@ def plot_training(tracked_params,name,plot=True, save=False):
     # add some spacing between plots 
     if save: 
         #plt.savefig(f'./plots/{name}.png')
-        fig.savefig(f'./plots/{name}.png')
+        fig.savefig(save_path+'.png')
     if plot:    
         plt.show()
     
@@ -412,7 +412,7 @@ def list_tracked_params_to_avg(list_tracked_params):
     for key in list_tracked_params[0].keys():
         avg_tracked_params[key] = list_tracked_params[0][key]
    
-    keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5']
+    keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5',"lr"]
     for key in keys:
         avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
     return avg_tracked_params
@@ -423,7 +423,7 @@ def plot_training_avg(list_tracked_params,name,plot=True, save=False):
     plot_training(avg_tracked_params, name,plot,save)
 
 
-def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False,device="cuda",verbose_tqdm=True):
+def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001, reduce_patience=5, reduce_factor=0.2, tracking_freq=5,early_stopping_patience=10, early_stopping_min_epochs=100, do_tracking=True, verbose=False,device="cuda",verbose_tqdm=True,optimizer="None"):
     # dictionary to keep track of training params and results
     if verbose: print("starting training")
     train_dict = {}
@@ -443,9 +443,14 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
     train_dict['train_acc_top5'] = []
     train_dict['val_acc_top1'] = []
     train_dict['val_acc_top5'] = []
-    train_dict['optimizer'] = "Adam"
-
-    optimizer = SGD(model.parameters(),momentum=momentum, lr=lr, weight_decay=weight_decay)
+    train_dict['optimizer'] = optimizer
+    if optimizer == "Adam":
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    elif optimizer == "SGD":
+        optimizer = SGD(model.parameters(),momentum=momentum, lr=lr, weight_decay=weight_decay)
+    else:
+        raise Exception("optimizer not supported")
+    
     criterion = ch.nn.CrossEntropyLoss()
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=reduce_patience, verbose=verbose, factor=reduce_factor)
     len_train_loader = len(loaders['train'])

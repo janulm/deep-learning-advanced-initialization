@@ -1,6 +1,5 @@
 import infrastructure as inf
 
-
 from argparse import ArgumentParser
 from typing import List
 import time
@@ -18,75 +17,106 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torchvision.models import resnet18
 
-from fastargs import get_current_config, Param, Section
-from fastargs.decorators import param
-from fastargs.validation import And, OneOf
-
-from ffcv.fields import IntField, RGBImageField
-from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-from ffcv.loader import Loader, OrderOption
-from ffcv.pipeline.operation import Operation
-from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-    RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-from ffcv.transforms.common import Squeeze
-from ffcv.writer import DatasetWriter
-
-device = inf.device
-print("Using device: ",device)
-
-# import the model 
-from Custom_ResNet18 import custom_resnet_18
-
-from tqdm import tqdm
-
-# do training on the models for the tupels of superclasses
-print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-print("torch.cuda.max_memory_reserved: %fGB"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
+def main():
+    device = inf.device
+    print("Using device: ",device)
 
 
-i = 0
-j = 1
+    torch.manual_seed(17)
 
-choices_lr = [0.1]
-choices_patience = [2,5,10]
-choices_factor = [0.2,0.5,0.8]
+    # import the model 
+    from Custom_ResNet18 import custom_resnet_18
 
-for lr in choices_lr:
-    for patience in choices_patience:
-        for factor in choices_factor:
-            ########## TRAINING 
 
-            print(f"Training model for superclasses {i} and {j} lr = {lr} patience = {patience} factor = {factor}")
-            paths =  [f'./data/subsets/{dataset_name}_superclass_{i}_{j}.beton' for dataset_name in ["train","test"]]
-            loaders, start_time = inf.make_dataloaders_ffcv(paths[0],paths[1])
-            model = custom_resnet_18(10)
-            model  = model.to(device)
-            model, tracked_params = inf.train(model, loaders,lr=lr,momentum=0.9,epochs=150,tracking_freq=2,reduce_factor=factor,reduce_patience=patience,do_tracking=True,early_stopping_min_epochs=150,early_stopping_patience=5,verbose=False)
-            print(f'Total time: {time.time() - start_time:.5f}')
-            # store the model   
-            torch.save(model.state_dict(), f'./models/model_{i}_{j}.pt')	
-            # save the tracked params
-            np.save(f"./models/tracked_params{i}_{j}_{lr}_{patience}_{factor}.npy", tracked_params)
+    from tqdm import tqdm
+
+    # adapting the code to to find out a good set of hyperparameters for ResNet 18, trained with the Adams Optimizer
+    # 
+
+
+    # check for normalization of data on and off
+    # check for different learning rates
+
+
+    choices_tuples = [(2,4),(3,5),(4,6),(5,8,)]
+
+    # Pytorch MPS enabled
+    choices_dataloaders_normalized = [inf.get_loaders_cifar100_superclass_subsets_pytorch(i,j,batch_size=128,num_workers=3,normalize=True) for i,j in choices_tuples]
+    choices_dataloaders_not_normalized = [inf.get_loaders_cifar100_superclass_subsets_pytorch(i,j,batch_size=128,num_workers=3,normalize=False) for i,j in choices_tuples]
+
+
+    choices_lr = [0.1,0.01]
+    choices_normalization = [True ,False]
+    choices_lr_reduce_patience = [5,100] # the second setting disables reduction completely
+    choice_optimizer = ["Adam","SGD"] 
+    epochs = 30
+
+    i = 0
+    num_total_runs = len(choices_lr)*len(choices_lr_reduce_patience)*len(choices_normalization)*len(choice_optimizer)
+
+    for lr in choices_lr:
+        for reduce_patience in choices_lr_reduce_patience:
+            for normalization in choices_normalization:
+                for optimizer in choice_optimizer:
+                    tracked_params = []
+                    print("Starting run: ",i,"/",num_total_runs)
+                    i += 1
+                    # iterate over the choices_tuples and train the model
+                    if normalization:
+                        ### normalized data loaders
+                        for loaders in choices_dataloaders_normalized:
+                            
+                            # generate a new random model for each run
+                            model = resnet18(weights=None).to(device)
+
+                            trained_model, tracked_run =  inf.train(model, loaders, epochs=epochs,lr=lr, momentum=0.9, tracking_freq=1, reduce_factor=0.5, reduce_patience=reduce_patience, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False,device=device,optimizer=optimizer)        
+                            tracked_params.append(tracked_run)
+
+                        
+                        # compute the average tracked params
+                        avg_tracked = inf.list_tracked_params_to_avg(tracked_params)
+                        # save the average tracked params to disk: 
+                        name = f'results_training_run2_Adams/hyper_param_testing/tracked_params_{lr}_{reduce_patience}_{normalization}_{optimizer}.npy'
+                        np.save(name,avg_tracked)
+                        
+                    else: 
+                        # not normalized data loaders
+                        for loaders in choices_dataloaders_not_normalized:
+                            
+                            # generate a new random model for each run
+                            model = resnet18(pretrained=False).to(device)
+
+                            trained_model, tracked_run =  inf.train(model, loaders, epochs=epochs,lr=lr, momentum=0.9, tracking_freq=1, reduce_factor=0.5, reduce_patience=5, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False,device=device,optimizer=optimizer)        
+                            tracked_params.append(tracked_run)
+
+                        
+                        # compute the average tracked params
+                        avg_tracked = inf.list_tracked_params_to_avg(tracked_params)
+                        # save the average tracked params to disk: 
+                        name = f'results_training_run2_Adams/hyper_param_testing/tracked_params_{lr}_{reduce_patience}_{normalization}_{optimizer}.npy'
+                        np.save(name,avg_tracked)
+                    
+                    
+                    
+
+    # compute plots
+
+    for lr in choices_lr:
+        for reduce_patience in choices_lr_reduce_patience:
+            for normalization in choices_normalization:
+                for optimizer in choice_optimizer:
+                    ########### CREATING PLOTS FROM THE TRACKED PARAMAS
+                    # read stored np array
+                    name = f'results_training_run2_Adams/hyper_param_testing/tracked_params_{lr}_{reduce_patience}_{normalization}_{optimizer}'
+                    tracked_params = np.load(name+".npy", allow_pickle=True).item()
+                    # plot training
+                    inf.plot_training(tracked_params,name, False, True,name)
             
-            # once done remove the model, tracked params and loaders from storage
-            name = f'model_{i}_{j}'
-            #inf.plot_training(tracked_params,name, False, True)
-            del model, tracked_params, loaders, start_time
-            torch.cuda.empty_cache()
-            print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-            print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-            print("torch.cuda.max_memory_reserved: %fGB"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
-       
-for lr in choices_lr:
-    for patience in choices_patience:
-        for factor in choices_factor:
-                ########## TRAINING 
-            ########### CREATING PLOTS FROM THE TRACKED PARAMAS
-            # read stored np array
-            tracked_params = np.load(f"./models/tracked_params{i}_{j}_{lr}_{patience}_{factor}.npy", allow_pickle=True).item()
-            # plot training
-            name = f'model_{i}_{j}_{lr}_{patience}_{factor}'
-            inf.plot_training(tracked_params,name, False, True)
-        
+
+
+#### main function call
+                    
+if __name__ == "__main__":
+    main()
