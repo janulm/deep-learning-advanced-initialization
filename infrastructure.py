@@ -404,18 +404,77 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     fig.clear()
     plt.close(fig)
 
+def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_only_mean,save,save_path,display): 
+    # dict is of the form:
+    # {"model_name": tracked_params(mean,min,,max), ...}
+    fig, axs = plt.subplots(1, 1, figsize=(10, 10))
+    # Plot for train_loss and val_loss for each model
+    colors = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan"]
+    # reverse colors array
+    colors = colors[::-1]
+    for model_name, (p_mean,p_min,p_max) in tracked_params_dict.items():
+        color = colors.pop()
+        if display_train_acc:
+            train_color = colors.pop()
+        # plot the mean values: 
+        x1 = np.arange(1, len(p_mean['train_loss'])+1, 1)
+        axs.plot(x1,p_mean['val_acc_top1'], label=f'val acc - {model_name}',color=color)
+        if display_train_acc:
+            axs.plot(x1,p_mean['train_acc_top1'], label=f'train acc - {model_name}',color=train_color)
+        
+        
+        # also plot min and max data: 
+        if not display_only_mean:
+            # plot val_acc min,max range
+            axs.fill_between(x1, p_min['val_acc_top1'], p_max['val_acc_top1'], alpha=0.2,color=color)
 
-def list_tracked_params_to_avg(list_tracked_params):
-    # Compute the average for each dimension in tracked_params
-    avg_tracked_params = {}
-    # for all keys except the individual losses and accuracies just copy the ones, since they are all the same
-    for key in list_tracked_params[0].keys():
-        avg_tracked_params[key] = list_tracked_params[0][key]
-   
-    keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5',"lr"]
-    for key in keys:
-        avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
-    return avg_tracked_params
+            if display_train_acc: 
+            # plot train_acc min,max range
+                axs.fill_between(x1, p_min['train_acc_top1'], p_max['train_acc_top1'], alpha=0.2,color=train_color)
+            
+    # add legend and titles to the plot
+    axs.legend()
+    axs.set_xlabel('Epoch')
+    axs.set_ylabel('Accuracy')
+    if display_train_acc:
+        axs.set_title('Training Accuracy and Validation Accuracy')
+    else:
+        axs.set_title('Validation Accuracy')
+        
+    # save the image to disk
+    if save:
+        fig.savefig(save_path+'.png')
+
+    if display:
+        plt.show()
+        plt.close(fig)
+
+def list_tracked_params_to_avg(list_tracked_params, also_min_max=False):
+    if not also_min_max:
+        # Compute the average for each dimension in tracked_params
+        avg_tracked_params = {}
+        # for all keys except the individual losses and accuracies just copy the ones, since they are all the same
+        for key in list_tracked_params[0].keys():
+            avg_tracked_params[key] = list_tracked_params[0][key]
+    
+        keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5',"lr"]
+        for key in keys:
+            avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
+        return avg_tracked_params
+    else: 
+        avg_tracked_params = {}
+        min_tracked_params = {}
+        max_tracked_params = {}
+        for key in list_tracked_params[0].keys():
+            avg_tracked_params[key] = list_tracked_params[0][key]
+            min_tracked_params[key] = list_tracked_params[0][key]
+            max_tracked_params[key] = list_tracked_params[0][key]
+        keys = ['train_loss','val_loss','train_acc_top1','train_acc_top5','val_acc_top1','val_acc_top5',"lr"]
+        for key in keys:
+            avg_tracked_params[key] = np.mean([params[key] for params in list_tracked_params], axis=0)
+            min_tracked_params[key] = np.min([params[key] for params in list_tracked_params], axis=0)
+            max_tracked_params[key] = np.max([params[key] for params in list_tracked_params], axis=0)
+        return avg_tracked_params, min_tracked_params, max_tracked_params
 
 def plot_training_avg(list_tracked_params,name,plot=True, save=False):
     avg_tracked_params = list_tracked_params_to_avg(list_tracked_params)

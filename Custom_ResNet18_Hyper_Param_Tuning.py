@@ -29,7 +29,7 @@ def main_train():
     print("Using device: ",device)
 
 
-    torch.manual_seed(17)
+    torch.manual_seed(42)
 
     # import the model 
     from Custom_ResNet18 import custom_resnet_18
