@@ -25,10 +25,13 @@ import torch.nn.functional as F
 
 ############## Hyperparameters ############## (Best values from Custom_ResNet18_Hyper_Param_Tuning.py)
 lr = 0.01
-optimizer = "Adam"
-lr_reduce_patience = 100
-normalization = False
+optimizer = "SGD"
+lr_reduce_patience = 5
+normalization = True
 epochs = 25
+
+
+### best params that use SGD as optimizer: Best val acc:  57.23  for lr:  0.01  reduce_patience:  5  normalization:  True  optimizer:  SGD
 
 device = inf.device
 #print("Using device: ",device)
@@ -44,9 +47,9 @@ def train_model(i, j):
     
     model, tracked_params = inf.train(model, loaders, epochs=epochs,lr=lr, momentum=0.9, tracking_freq=1, reduce_factor=0.5, reduce_patience=lr_reduce_patience, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False,device=device,optimizer=optimizer)        
     # store the model
-    torch.save(model.state_dict(), f'./results_training_run2_Adams/models/model_{i}_{j}.pt')    
+    torch.save(model.state_dict(), f'./results_training_run2_Adams/models_sgd/model_{i}_{j}.pt')    
     # save the tracked params
-    np.save(f"./results_training_run2_Adams/models/tracked_params{i}_{j}.npy", tracked_params)
+    np.save(f"./results_training_run2_Adams/models_sgd/tracked_params{i}_{j}.npy", tracked_params)
     # print final accuracys
     #print(f"Final accuracys for superclasses {i} and {j}")
     print(f"Train accuracy: {tracked_params['train_acc_top1'][-1]}")

@@ -119,7 +119,7 @@ def main_plot(plot=True):
                     
                     # compute the mean of the last 5 epochs on the validation acc
                     val = np.mean(tracked_params["val_acc_top1"][-5:])
-                    if val > best_value:
+                    if optimizer == "SGD" and val > best_value:
                         best_value = val
                         param_tuple = (lr,reduce_patience,normalization,optimizer)
 
@@ -134,7 +134,7 @@ def main_plot(plot=True):
 #### main function call
                     
 if __name__ == "__main__":
-    main_train()
+    #main_train()
     main_plot(False)
 
 
