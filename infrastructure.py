@@ -405,7 +405,7 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     fig.clear()
     plt.close(fig)
 
-def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_only_mean,save,save_path,display): 
+def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_only_mean,save,save_path,display,display_max_instead_of_mean=False): 
     # dict is of the form:
     # {"model_name": tracked_params(mean,min,,max), ...}
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
@@ -415,13 +415,18 @@ def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_on
     colors = colors[::-1]
     for model_name, (p_mean,p_min,p_max) in tracked_params_dict.items():
         color = colors.pop()
-        if display_train_acc:
-            train_color = colors.pop()
+            
         # plot the mean values: 
         x1 = np.arange(1, len(p_mean['train_loss'])+1, 1)
-        axs.plot(x1,p_mean['val_acc_top1'], label=f'val acc - {model_name}',color=color)
+        
+        if display_max_instead_of_mean:
+            axs.plot(x1,p_max['val_acc_top1'], label=f'max val acc - {model_name}',color=color)
+        else:
+            axs.plot(x1,p_mean['val_acc_top1'], label=f'mean val acc - {model_name}',color=color)
+        
         if display_train_acc:
-            axs.plot(x1,p_mean['train_acc_top1'], label=f'train acc - {model_name}',color=train_color)
+            train_color = colors.pop()
+            axs.plot(x1,p_mean['train_acc_top1'], label=f'mean train acc - {model_name}',color=train_color)
         
         
         # also plot min and max data: 
