@@ -166,7 +166,8 @@ def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batc
         dset = datasets[dataset_name]
         should_shuffle = dataset_name == "train"
         if num_workers > 0:
-            loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers, multiprocessing_context="forkserver", persistent_workers=True)
+            #loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers, multiprocessing_context="forkserver", persistent_workers=True)
+            loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers,persistent_workers=True)
         else:
             loader = DataLoader(dset, batch_size=batch_size, shuffle=should_shuffle, num_workers=num_workers)
         loaders[dataset_name] = loader
@@ -409,7 +410,7 @@ def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_on
     # {"model_name": tracked_params(mean,min,,max), ...}
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
     # Plot for train_loss and val_loss for each model
-    colors = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan"]
+    colors = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan","magenta","yellow","black","darkblue","darkorange","darkgreen","darkred","darkpurple","darkbrown","darkpink","darkgray","darkolive","darkcyan","darkmagenta","darkyellow","darkblack"]
     # reverse colors array
     colors = colors[::-1]
     for model_name, (p_mean,p_min,p_max) in tracked_params_dict.items():
