@@ -410,7 +410,7 @@ def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_on
     # {"model_name": tracked_params(mean,min,,max), ...}
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
     # Plot for train_loss and val_loss for each model
-    colors = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan","magenta","yellow","black","darkblue","darkorange","darkgreen","darkred","darkpurple","darkbrown","darkpink","darkgray","darkolive","darkcyan","darkmagenta","darkyellow","darkblack"]
+    colors = ["blue","orange","green","red","purple","brown","yellow","gray","olive","cyan","magenta","pink","black","darkblue","darkorange","darkgreen","darkred","darkpurple","darkbrown","darkpink","darkgray","darkolive","darkcyan","darkmagenta","darkyellow","darkblack"]
     # reverse colors array
     colors = colors[::-1]
     for model_name, (p_mean,p_min,p_max) in tracked_params_dict.items():
