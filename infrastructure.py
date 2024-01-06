@@ -441,11 +441,7 @@ def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_on
     # add legend and titles to the plot
     axs.legend()
     axs.set_xlabel('Epoch')
-    axs.set_ylabel('Accuracy')
-    if display_train_acc:
-        axs.set_title('Training Accuracy and Validation Accuracy')
-    else:
-        axs.set_title('Validation Accuracy')
+    axs.set_ylabel('Validation accuracy')
         
     # save the image to disk
     if save:
