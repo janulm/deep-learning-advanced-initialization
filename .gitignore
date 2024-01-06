@@ -3,4 +3,4 @@ __pychache__/
 *.pt
 *.pth
 .vscode
-
+.DS_Store
