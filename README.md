@@ -4,12 +4,12 @@ Deep Learning Project ETHZ HS23 from Jannek Ulm, Leander Diaz-Bone, Alexander Ba
 
 ## Training the models
 
-TODO
+We provide two different python environments for training the models and running the experiments. The "environment_cuda" is working for us on Linux Machine with CUDA 12, the "environment_mps" works on new Apple Silicon Macbooks and uses the Apples MPS GPU acceleration. For specific device/cuda versions one might need to adapt the environment files. When running the [training file](./resnet18_training.py) all the pre-trained models required for the experiments are automatically saved in the [models](./experiment_results/models) folder. 
 
 ## Running the experiments from the paper
 
 Most experiments require pretrained models on subsets of CIFAR-100.
-Due to the size of a pretrained model, they are not included in this repository, however they can easily be realculated using [this](./Custom_ResNet18_Training.py) training file (for the original ResNet-18 model and also for the custom ResNet-18 model).
+Due to the size of a pretrained model, they are not included in this repository, however they can easily be recalculated using [this](./Custom_ResNet18_Training.py) training file (for the original ResNet-18 model and also for the custom ResNet-18 model).
 All models were trained on 10 classes, which were chosen from 2 superclasses with indices between 0 and 9.
 
 ## Rerunning the experiments
