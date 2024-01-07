@@ -1,91 +1,76 @@
 # Deep Learning Advanced Initialization
 
-Deep Learning Project ETHZ HS23
+Deep Learning Project ETHZ HS23 from Jannek Ulm, Leander Diaz-Bone, Alexander Bayer, and Dennis Jüni
 
-## Creating the python environment for ffcv:
+## Training the models
 
-For CUDA devices: Clone the environment_cuda.yaml file
-For Apple/MPS devices: TBD
+TODO
 
-Data:
+## Running the experiments from the paper
 
-https://www.binarystudy.com/2021/09/how-to-load-preprocess-visualize-CIFAR-10-and-CIFAR-100.html
+Most experiments require pretrained models on subsets of CIFAR-100.
+Due to the size of a pretrained model, they are not included in this repository, however they can easily be realculated using [this](./Custom_ResNet18_Training.py) training file (for the original ResNet-18 model and also for the custom ResNet-18 model).
+All models were trained on 10 classes, which were chosen from 2 superclasses with indices between 0 and 9.
 
-https://www.cs.toronto.edu/~kriz/cifar.html download link
+## Rerunning the experiments
 
-download cifar 100 for python: https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz
+All experiments from the paper are shown in [final_experiments.ipynb](./final_experiments.ipynb).
 
-CIFAR-100 -> 20 Superclasses, two vehicle classes extra for final model
+1. Testing the accuracy a randomly initialized model on random tuples of superclasses with indices between 10 and 19.
+2. Testing the accuracy of a pretrained model (on some superclasses with indices between 0 and 9) and then re-trained on a random tuple of superclasses with indices between 10 and 19.
+3. Testing the initialization with Gabor filters with 1,2,6,10, and 17 layers being initialized.
+4. Testing the number of pretrained models used for clustering (with 10 clusters and 17 layers being initialized) with Euclidean and Fourier distance.
+5. Testing the number of clusters used for clustering (with 10 models and 17 layers being initialized) with Euclidean and Fourier distance.
+6. Testing the number of layers initialized for clustering (with 10 models and 10 cllusters) with Euclidean and Fourier distance.
+7. Testing a randomly initialized _custom_ ResNet-18.
+8. Testing a _custom_ ResNet-18 which was clustered and permuted according to the alignment algorithm.
+9. Testing a random ResNet-18 model on the Tiny ImageNet dataset.
+10. Testing a pretrained ResNet-18 (pretrained on a subset of 10 CIFAR-100 superclasse) on the Tiny ImageNet dataset.
+11. Testing a clustered ResNet-18 model on the Tiny ImageNet dataset.
 
-We want to split classes:
+All the validation and training accuracies during the run of these experiments were saved in [tracked_params](./experiment_results/tracked_params/).
 
-Model: ResNet-18, import using pytorch, is possible to initialize with pretrained and random weights.
+## Plotting the results
 
-ResnetPaper: https://arxiv.org/pdf/1512.03385.pdf
+All plots from the paper were generated using parameters in [tracked_params](./experiment_results/tracked_params/).
+The specific code used can be found in [final_plotting.ipynb](./final_plotting.ipynb).
 
-Datasets:
+#### Figure 2 - Single-filter Clustering Initialization Methods
 
-100 classes in total, 20 superclasses, 5 classes per superclass
+![Figure 2](/experiment_results/plots/figure2.png)
 
-2 vehicle _ 10 classes
-18 something _ 10 classes
+#### Figure 3 - Varying number of Clusters
 
-for each superclass we have 5 classes
+![Figure 3](/experiment_results/plots/figure3.png)
 
-## Ways to split dataset to learn multiple models:
+#### Figure 4 - Varying number of layers
 
-18 superclass: each 5 models
+![Figure 4](/experiment_results/plots/figure4.png)
 
-Way 1: 18 models: 5 classes classification per model
-Way 2: 45 models: 2 classes classification per model
+## Figure 5 - Varying number of models
 
-Way 3: for each 18 superclasses: (5 classes) 5 * 4/2 = 10 models: 2 classes classification per model
-combine every possible pair: 5*4/2 = 10 models
-=> 180 models in total (Hopefully feasible), or sample from this space?
+![Figure 5](/experiment_results/plots/figure5.png)
 
-Way 4: n\*(n-1)/2 models: 2 classes classification per model
-combine every possible pair:
-4005 models in total (Infeasible)
+## Figure 6 - Custom model with alignment
 
-Way 5: Way1 + Sampling 5 classes out of 90:
-maybe sampling such that each group consits of at most 3 superclasses?
+![Figure 6](/experiment_results/plots/figure6.png)
 
-Layer1: 64 filters each 7*7: we could train (using way3) 180*64 filters -> 11520 filters
+## Figure 7 - Gabor varying number of layers
 
-## How do we get the initialization distribution?
+![Figure 7](/experiment_results/plots/figure7.png)
 
-For each layer (has n filters): gather from all trained models all filters:
-cluster them into (m >= n)? clusters (some smart ways)
+## Figure 8 - Compare initializing first layer
 
-E.g. for layer 1 (64 filters) with way3: we have 11520 filters
-cluster them,
-sample from the 64 highest clusters?
+![Figure 8](/experiment_results/plots/figure8.png)
 
-## Experiment 1:
+## Figure 9 - Tiny ImageNet Comparison
 
-Randomly intialize models
-Test how good model works...
+![Figure 9](/experiment_results/plots/figure9.png)
 
-## Experiment 2:
+## Table 1 - Tiny ImageNet accuracies
 
-Use Gabor Filters as Initialization
-Train models, get distribution?
-
-## Experiment 3:
-
-Get distributions of each above
-and use them to initialize the model, compare which perform better on 2 vehicle superclasses?
-In what architecture?
-
-We have the following initilization distributions to compare:
-
-random initialization: (cheap)
-pretrained and sampled using Gabor Filters as init: (expensive)
-pretrained and sampled using random as init: (expensive)
-
-Way 1: 10 class classification?
-Way 2: 2 class classification? -> test on 10\*9/2 = 45 models
-
-## TODO:
-
-Find out how expensive it is to train 1 binary resnet-18 model
+| Model                    | Epoch 5 | Epoch 15 |
+| ------------------------ | ------- | -------- |
+| Random initialization    | 28.246  | 30.924   |
+| Pre-trained on CIFAR-100 | 28.338  | 30.268   |
+| Clustered initialization | 31.1    | 35.374   |
