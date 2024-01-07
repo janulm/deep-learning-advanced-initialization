@@ -106,4 +106,4 @@ if __name__ == "__main__":
 
 
     # the best hyperparameters are:
-    # Best val acc:  61.48  for lr:  0.01  reduce_patience:  100  normalization:  False  optimizer:  Adam
+    # for lr:  0.01  reduce_patience:  5  normalization:  True  optimizer:  SGD
