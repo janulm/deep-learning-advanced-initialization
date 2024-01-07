@@ -1,51 +1,33 @@
 ############## INFRASTRUCTURE ##############
 # This file contains all the imports and definitions of the code that is reused many times in the project.
-from argparse import ArgumentParser
 from typing import List
 import time
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
-import torch    
+import torch  
+import torchvision 
 
-import torch as ch
-from torch.cuda.amp import GradScaler, autocast
-from torch.nn import CrossEntropyLoss, Conv2d, BatchNorm2d
 from torch.optim import SGD, Adam, lr_scheduler
 from torchvision.transforms import v2
-import torchvision
-import torch.nn as nn
-import torch.nn.functional as F
-
-import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-#print(f'Using (why does print here device {device}')
 
-
-#def do_imports_ffcv():
-#from fastargs import get_current_config, Param, Section
-#from fastargs.decorators import param
-#from fastargs.validation import And, OneOf
 
 
 def write_cifar100_to_beton(): 
     from ffcv.fields import IntField, RGBImageField
-    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-    from ffcv.loader import Loader, OrderOption
-    from ffcv.pipeline.operation import Operation
-    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-    from ffcv.transforms.common import Squeeze
     from ffcv.writer import DatasetWriter
+
     train_dataset="./data/cifar_train.beton"
     val_dataset="./data/cifar_test.beton"
     datasets = {
-    'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
-    'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
+        'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
+        'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
     }
 
     for (name, ds) in datasets.items():
@@ -56,8 +38,6 @@ def write_cifar100_to_beton():
         })
         writer.from_indexed_dataset(ds)
 
-# helper function load the coarse labels (maps each label to its superclass)
-# source: https://github.com/ryanchankh/cifar100coarse/tree/master
 
 def sparse2coarse(targets):
     """Convert Pytorch CIFAR100 sparse targets to coarse targets.
@@ -103,12 +83,6 @@ def get_cifar_classes():
 
 def write_cifar100_superclass_subsets_to_beton():
     from ffcv.fields import IntField, RGBImageField
-    from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
-    from ffcv.loader import Loader, OrderOption
-    from ffcv.pipeline.operation import Operation
-    from ffcv.transforms import RandomHorizontalFlip, Cutout, \
-        RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
-    from ffcv.transforms.common import Squeeze
     from ffcv.writer import DatasetWriter
     # takes every pair of 20 the superclasses 
     # and creates a dataset with the corresponding 10 classes
@@ -143,7 +117,6 @@ def write_cifar100_superclass_subsets_to_beton():
                 del idx, subset_data, unique_labels, label_mapping, remapped_data, writer
                 
 
-
 class CIFAR100Subset(Dataset):
     def __init__(self, data, targets, transform=None):
         self.data = data
@@ -159,7 +132,10 @@ class CIFAR100Subset(Dataset):
     def __len__(self):
         return len(self.data)
 
-def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batch_size=256, num_workers=12, normalize=False):
+def get_loaders_cifar100_superclass_subsets_pytorch(superclass1, superclass2, batch_size=256, num_workers=12, normalize=True):
+    """
+    Returns a dictionary of Pytorch dataloaders for the given pair of superclasses.
+    """
     loaders = {}
     datasets = get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,normalize)
     for dataset_name in ["train", "test"]:
@@ -176,25 +152,30 @@ def get_loaders_cifar100_superclass_subsets_pytorch(superclass1,superclass2,batc
     return loaders
 
 
-def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,normalize=True):
+def get_dataset_cifar100_superclass_subsets_pytorch(superclass1, superclass2, normalize=True):
+    """
+    Returns a dictionary of CIFAR100Subset datasets for the given pair of superclasses.
+    """
     assert superclass1 != superclass2, "superclass1 and superclass2 must be different"
     assert superclass1 <= 19 and superclass1 >= 0, "superclass1 must be between 0 and 19"
     assert superclass2 <= 19 and superclass2 >= 0, "superclass2 must be between 0 and 19"
-    superclass1,superclass2 = min(superclass1,superclass2),max(superclass1,superclass2)
+    superclass1, superclass2 = min(superclass1, superclass2), max(superclass1, superclass2)
 
     datasets = {
-    'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
-    'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
+        'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
+        'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
     }
-    loaders = {}
     datasets["train"].coarse_targets = sparse2coarse(datasets["train"].targets)
     datasets["test"].coarse_targets = sparse2coarse(datasets["test"].targets)
     
+    # computed these values earlier and hardcoded them here
     CIFAR_MEAN = [0.5071, 0.4867, 0.4408]
     CIFAR_STD = [0.2675, 0.2565, 0.2761]
+
     transforms = {}
     if normalize:
         transforms = {
+            # if v2.ToImage does not work (due to torchversion) replace ToImage & ToDtype with ToTensor
             'train': v2.Compose([
                 v2.RandomHorizontalFlip(),
                 v2.RandomRotation(15),
@@ -214,12 +195,10 @@ def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,norm
                 v2.RandomRotation(15),
                 v2.ToImage(), 
                 v2.ToDtype(torch.float32, scale=True),
-                #v2.Normalize(CIFAR_MEAN, CIFAR_STD)
             ]),
             'test': v2.Compose([ 
                 v2.ToImage(), 
                 v2.ToDtype(torch.float32, scale=True),
-                #v2.Normalize(CIFAR_MEAN, CIFAR_STD)
             ])}
 
     dsets = {}
@@ -240,7 +219,6 @@ def get_dataset_cifar100_superclass_subsets_pytorch(superclass1,superclass2,norm
 
         dset = CIFAR100Subset(data, targets_remapped, transform=transforms[dataset_name])
         dsets[dataset_name] = dset
-        #del idx, data, targets, unique_labels, label_mapping, targets_remapped
     return dsets
 
 
@@ -250,24 +228,18 @@ def get_loaders_cifar100_superclass_subsets_ffcv(superclass1,superclass2,batch_s
     assert superclass2 <= 19 and superclass2 >= 0, "superclass2 must be between 0 and 19"
     superclass1,superclass2 = min(superclass1,superclass2),max(superclass1,superclass2)
 
-    datasets = {
-    'train': torchvision.datasets.CIFAR100('./data', train=True, download=True),
-    'test': torchvision.datasets.CIFAR100('./data', train=False, download=True)
-    }
     paths = [f'./data/subsets/{dataset_name}_superclass_{superclass1}_{superclass2}.beton' for dataset_name in ["train","test"]]
-    loaders, start_time = make_dataloaders_ffcv(paths[0],paths[1],batch_size=batch_size,num_workers=num_workers,device=device)
+    loaders, _ = make_dataloaders_ffcv(paths[0], paths[1], batch_size=batch_size, num_workers=num_workers, device=device)
     return loaders    
     
 
 def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset="./data/cifar_test.beton", batch_size=256, num_workers=12,device="cuda"):
-    from ffcv.fields import IntField, RGBImageField
     from ffcv.fields.decoders import IntDecoder, SimpleRGBImageDecoder
     from ffcv.loader import Loader, OrderOption
     from ffcv.pipeline.operation import Operation
     from ffcv.transforms import RandomHorizontalFlip, Cutout, \
         RandomTranslate, Convert, ToDevice, ToTensor, ToTorchImage
     from ffcv.transforms.common import Squeeze
-    from ffcv.writer import DatasetWriter
     paths = {
         'train': train_dataset,
         'test': val_dataset
@@ -279,7 +251,7 @@ def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset=
     loaders = {}
 
     for name in ['train', 'test']:
-        label_pipeline: List[Operation] = [IntDecoder(), ToTensor(), ToDevice(ch.device(device)), Squeeze()]
+        label_pipeline: List[Operation] = [IntDecoder(), ToTensor(), ToDevice(torch.device(device)), Squeeze()]
         image_pipeline: List[Operation] = [SimpleRGBImageDecoder()]
         if name == 'train':
             image_pipeline.extend([
@@ -289,9 +261,9 @@ def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset=
             ])
         image_pipeline.extend([
             ToTensor(),
-            ToDevice(ch.device(device), non_blocking=True),
+            ToDevice(torch.device(device), non_blocking=True),
             ToTorchImage(),
-            Convert(ch.float32), # TODO check what the impact for float16 is (it was the initial value, and why it crashes with float16)	
+            Convert(torch.float32),
         ])
         if name == 'train':
             image_pipeline.extend([
@@ -311,21 +283,20 @@ def make_dataloaders_ffcv(train_dataset="./data/cifar_train.beton", val_dataset=
     return loaders, start_time
 
 
-import matplotlib.pyplot as plt
-
-def plot_training(tracked_params,name,plot=True, save=False,save_path="./plots/"):
+def plot_training(tracked_params, name, plot=True, save=False, save_path="./plots/"):
     # Plot the training curves
     fig, axs = plt.subplots(1, 2, figsize=(20, 10))
-    desc = f"Model was trained for {tracked_params['epochs']} epochs, with a weight decay of {tracked_params['weight_decay']}, a learning rate of {tracked_params['lr']} and a momentum of {tracked_params['momentum']} and reduce factor of {tracked_params['reduce_factor']}."
+    desc = f"Model {name} was trained for {tracked_params['epochs']} epochs, with a weight decay of {tracked_params['weight_decay']}, a learning rate of {tracked_params['lr']} and a momentum of {tracked_params['momentum']} and reduce factor of {tracked_params['reduce_factor']}."
+   
     # plot the training loss together with the learning rate
-    # compute the x-axis for the train loss, sampled every epoch\
-    # set title for the plot
-        
+    # compute the x-axis for the train loss, sampled every epoch
+    # set title for the plot    
     x1 = np.arange(0, len(tracked_params['train_loss']), 1)
     axs[0].plot(x1,tracked_params['train_loss'], label='train_loss')
     axs[0].set_xlabel('Epoch')
     axs[0].set_ylabel('Loss')
     axs[0].set_title(desc)
+
     # add the val_loss to the plot
     # compute the x-axis for the val loss, sampled every "tracking_freq" epoch
     stop = len(tracked_params['val_loss'])*tracked_params['tracking_freq']
@@ -337,7 +308,6 @@ def plot_training(tracked_params,name,plot=True, save=False,save_path="./plots/"
     ax2 = axs[0].twinx()
     ax2.plot(tracked_params['lr_list'], label='learning_rate', color='red')
     ax2.set_ylabel('Learning Rate') 
-    # fix that on this plot the legends are overlapping
     
     # plot the training accuracy
     axs[1].plot(x2,tracked_params['train_acc_top1'], label='train_acc')
@@ -345,11 +315,10 @@ def plot_training(tracked_params,name,plot=True, save=False,save_path="./plots/"
     axs[1].plot(x2,tracked_params['val_acc_top1'], label='val_acc')
     axs[1].set_xlabel('Epoch')
     axs[1].set_ylabel('Accuracy')
-    #axs[1].set_title(desc)
+
     axs[1].legend()
     # add some spacing between plots 
     if save: 
-        #plt.savefig(f'./plots/{name}.png')
         fig.savefig(save_path+'.png')
     if plot:    
         plt.show()
@@ -357,15 +326,11 @@ def plot_training(tracked_params,name,plot=True, save=False,save_path="./plots/"
     # free up memory
     fig.clear()
     plt.close(fig)
-    # add the val_loss to the plot
+
 
 def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     # Plot the training curves for two tracked_params on the same plot
     fig, axs = plt.subplots(1, 2, figsize=(20, 10))
-    
-    # Plot for train_loss and val_loss
-    desc1 = f"{name1}\nEpochs: {tracked_params1['epochs']}, Weight Decay: {tracked_params1['weight_decay']}, Learning Rate: {tracked_params1['lr']}, Momentum: {tracked_params1['momentum']}, Reduce Factor: {tracked_params1['reduce_factor']}"
-    desc2 = f"{name2}\nEpochs: {tracked_params2['epochs']}, Weight Decay: {tracked_params2['weight_decay']}, Learning Rate: {tracked_params2['lr']}, Momentum: {tracked_params2['momentum']}, Reduce Factor: {tracked_params2['reduce_factor']}"
     
     # Plot train_loss and val_loss for model 1
     x1 = np.arange(0, len(tracked_params1['train_loss']), 1)
@@ -405,7 +370,7 @@ def plot_trainings(tracked_params1, tracked_params2, name1, name2):
     fig.clear()
     plt.close(fig)
 
-def plot_trainings_mean_min_max(tracked_params_dict,display_train_acc,display_only_mean,save,save_path,display,display_max_instead_of_mean=False): 
+def plot_trainings_mean_min_max(tracked_params_dict, display_train_acc, display_only_mean, save, save_path, display, display_max_instead_of_mean=False): 
     # dict is of the form:
     # {"model_name": tracked_params(mean,min,,max), ...}
     fig, axs = plt.subplots(1, 1, figsize=(10, 10))
@@ -512,7 +477,7 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
     else:
         raise Exception("optimizer not supported")
     
-    criterion = ch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=reduce_patience, verbose=verbose, factor=reduce_factor)
     len_train_loader = len(loaders['train'])
     len_val_loader = len(loaders['test'])
@@ -555,7 +520,7 @@ def train(model, loaders, lr=0.1, epochs=100, momentum=0.9, weight_decay=0.0001,
             val_loss = 0.0
             total_val_correct, total_val_num, total_val_correct_top5 = 0., 0., 0.
             model.eval()
-            with ch.no_grad():
+            with torch.no_grad():
                 for val_ims, val_labs in loaders['test']:
                     val_ims = val_ims.to(device, non_blocking=True)
                     val_labs = val_labs.to(device, non_blocking=True)
