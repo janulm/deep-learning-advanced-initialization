@@ -4,7 +4,7 @@ Deep Learning Project ETHZ HS23 from Jannek Ulm, Leander Diaz-Bone, Alexander Ba
 
 ## Training the models
 
-We provide two different python environments for training the models and running the experiments. The "environment_cuda" is working for us on Linux Machine with CUDA 12, the "environment_mps" works on new Apple Silicon Macbooks and uses the Apples MPS GPU acceleration. For specific device/cuda versions one might need to adapt the environment files. When running the [training file](./resnet18_training.py) all the pre-trained models required for the experiments are automatically saved in the [models](./experiment_results/models) folder. 
+We provide two different python environments for training the models and running the experiments. The "environment_cuda" is working for us on a Linux Machine with CUDA 12, the "environment_mps" works on new Apple Silicon Macbooks and uses the Apples MPS GPU acceleration. For specific device/cuda versions one might need to adapt the environment files. When running the [training file](./resnet18_training.py) all the pre-trained models required for the experiments are automatically saved in the [models](./experiment_results/models) folder. 
 
 ## Running the experiments from the paper
 
