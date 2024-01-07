@@ -1,22 +1,7 @@
-import infrastructure as inf
-
-from argparse import ArgumentParser
-from typing import List
-import time
 import numpy as np
-from tqdm import tqdm
+import torch
 
-import torch    
-
-import torch as ch
-from torch.cuda.amp import GradScaler, autocast
-from torch.nn import CrossEntropyLoss, Conv2d, BatchNorm2d
-from torch.optim import SGD, lr_scheduler
-from torchvision.transforms import v2
-import torchvision
-import torch.nn as nn
-import torch.nn.functional as F
-
+import infrastructure as inf
 from torchvision.models import resnet18
 
 choices_lr = [0.1,0.01]
@@ -28,30 +13,13 @@ def main_train():
     device = inf.device
     print("Using device: ",device)
 
-
     torch.manual_seed(42)
-
-    # import the model 
-    from Custom_ResNet18 import custom_resnet_18
-
-
-    from tqdm import tqdm
-
-    # adapting the code to to find out a good set of hyperparameters for ResNet 18, trained with the Adams Optimizer
-    # 
-
-
-    # check for normalization of data on and off
-    # check for different learning rates
-
 
     choices_tuples = [(2,4),(3,5),(4,6),(5,8,)]
 
     # Pytorch MPS enabled
     choices_dataloaders_normalized = [inf.get_loaders_cifar100_superclass_subsets_pytorch(i,j,batch_size=128,num_workers=3,normalize=True) for i,j in choices_tuples]
     choices_dataloaders_not_normalized = [inf.get_loaders_cifar100_superclass_subsets_pytorch(i,j,batch_size=128,num_workers=3,normalize=False) for i,j in choices_tuples]
-
-
 
     epochs = 30
 
@@ -73,7 +41,7 @@ def main_train():
                             # generate a new random model for each run
                             model = resnet18(weights=None).to(device)
 
-                            trained_model, tracked_run =  inf.train(model, loaders, epochs=epochs,lr=lr, momentum=0.9, tracking_freq=1, reduce_factor=0.5, reduce_patience=reduce_patience, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False,device=device,optimizer=optimizer)        
+                            _, tracked_run =  inf.train(model, loaders, epochs=epochs,lr=lr, momentum=0.9, tracking_freq=1, reduce_factor=0.5, reduce_patience=reduce_patience, do_tracking=True, early_stopping_min_epochs=80, early_stopping_patience=5, verbose=False,device=device,optimizer=optimizer)        
                             tracked_params.append(tracked_run)
 
                         
@@ -134,7 +102,6 @@ def main_plot(plot=True):
 #### main function call
                     
 if __name__ == "__main__":
-    #main_train()
     main_plot(False)
 
 
