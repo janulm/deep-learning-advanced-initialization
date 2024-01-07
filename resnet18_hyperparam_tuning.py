@@ -7,7 +7,7 @@ from torchvision.models import resnet18
 choices_lr = [0.1,0.01]
 choices_normalization = [True ,False]
 choices_lr_reduce_patience = [5,100] # the second setting disables reduction completely
-choice_optimizer = ["Adam","SGD"] 
+choice_optimizer = ["SGD"] 
 
 def main_train():
     device = inf.device
