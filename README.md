@@ -2,6 +2,11 @@
 
 Deep Learning Project ETHZ HS23 from Jannek Ulm, Leander Diaz-Bone, Alexander Bayer, and Dennis Jüni
 
+We introduce a novel weight initialization technique for Convolutional Neural Networks, focusing on image classification using the CIFAR100 dataset. Our weight initialization technique initializes the convolutional filters by drawing samples from a clustering computed on previously learned filters. Our findings show that this method significantly outperforms known initialization techniques, improving validation accuracy and leading to better generalization on unseen image datasets. This offers a new approach to CNN weight initialization, with potential applications in more complex models and datasets, which may enable more efficient networks and faster training.
+
+For more details please check out our [report][Leaning an Informed CNN Initialization for Image Classification.pdf].
+---
+
 ## Training the models
 
 We provide two different python environments for training the models and running the experiments. The "environment_cuda" is working for us on a Linux Machine with CUDA 12, the "environment_mps" works on new Apple Silicon Macbooks and uses the Apples MPS GPU acceleration. For specific device/cuda versions one might need to adapt the environment files. When running the [training file](./resnet18_training.py) all the pre-trained models required for the experiments are automatically saved in the [models](./experiment_results/models) folder. 
