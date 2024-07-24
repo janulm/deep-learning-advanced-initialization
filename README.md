@@ -4,7 +4,7 @@ Deep Learning Project ETHZ HS23 from Jannek Ulm, Leander Diaz-Bone, Alexander Ba
 
 We introduce a novel weight initialization technique for Convolutional Neural Networks, focusing on image classification using the CIFAR100 dataset. Our weight initialization technique initializes the convolutional filters by drawing samples from a clustering computed on previously learned filters. Our findings show that this method significantly outperforms known initialization techniques, improving validation accuracy and leading to better generalization on unseen image datasets. This offers a new approach to CNN weight initialization, with potential applications in more complex models and datasets, which may enable more efficient networks and faster training.
 
-For more details please check out our [report](Leaning an Informed CNN Initialization for Image Classification.pdf).
+For more details please check out our [report](Leaning_an_Informed_CNN_Initialization_for_Image_Classification.pdf).
 
 
 
